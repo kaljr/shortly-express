@@ -28,6 +28,14 @@ app.use(express.static(__dirname + '/public'));
 //                   resave: false,
 //                   saveUninitialized: true}));
 
+var startSession = function() {
+  app.use(session({ secret: 'something',
+                   cookie: { maxAge: 10000 },
+                   resave: false,
+                   saveUninitialized: true}));
+};
+
+// function to check for current session, otherwise send to login
 var restrict =  function(req,res,next) {
   if(req.session) {
     console.log('you have a session');
@@ -36,14 +44,15 @@ var restrict =  function(req,res,next) {
   }
 };
 
+
 app.get('/', restrict);
 
-app.get('/create',
+app.get('/create', restrict,
 function(req, res) {
   res.render('index');
 });
 
-app.get('/links',
+app.get('/links', restrict,
 function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
@@ -90,6 +99,26 @@ function(req, res) {
 
 app.get('/login', function(req,res) {
   res.render('login');
+});
+
+app.post('/login', function(req,res) {
+    new User({username: req.body.username,
+              password: req.body.password}).fetch().then(function(user) {
+                if(user) {
+                  startSession();
+                res.redirect(301,'/');
+              } else {
+                res.redirect(301,'/login');
+              }
+              });
+});
+
+app.post('/signup', function(req, res) {
+  new User({username: req.body.username,
+            password: req.body.password}).save().then(function() {
+              startSession();
+              res.redirect(301,'/');
+            });
 });
 
 
