@@ -23,29 +23,25 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
 // use sessions
-// app.use(session({ secret: 'something',
-//                   cookie: { maxAge: 10000 },
-//                   resave: false,
-//                   saveUninitialized: true}));
-
-var startSession = function() {
-  app.use(session({ secret: 'something',
+app.use(session({ secret: 'something',
+                    loggedin: false,
                    cookie: { maxAge: 10000 },
                    resave: false,
                    saveUninitialized: true}));
-};
 
 // function to check for current session, otherwise send to login
 var restrict =  function(req,res,next) {
-  if(req.session) {
-    console.log('you have a session');
+  if(req.session.loggedin) {
+    next();
   } else {
     res.redirect(301,"/login");
   }
 };
 
 
-app.get('/', restrict);
+app.get('/', restrict, function(req,res) {
+  res.render('index');
+});
 
 app.get('/create', restrict,
 function(req, res) {
@@ -105,19 +101,27 @@ app.post('/login', function(req,res) {
     new User({username: req.body.username,
               password: req.body.password}).fetch().then(function(user) {
                 if(user) {
-                  startSession();
-                res.redirect(301,'/');
+                  req.session.regenerate(function() {
+                    req.session.loggedin = true;
+                    res.redirect(301,'/');
+                  });
               } else {
                 res.redirect(301,'/login');
               }
               });
 });
 
+app.get('/signup', function(req,res) {
+  res.render('signup');
+});
+
 app.post('/signup', function(req, res) {
   new User({username: req.body.username,
             password: req.body.password}).save().then(function() {
-              startSession();
-              res.redirect(301,'/');
+              req.session.regenerate(function() {
+                req.session.loggedin = true;
+                res.redirect(301,'/');
+              });
             });
 });
 
