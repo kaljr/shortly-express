@@ -2,7 +2,7 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
-//var session = require('express-session');
+var session = require('express-session');
 var bcrypt = require('bcrypt-nodejs');
 
 var db = require('./app/config');
@@ -11,8 +11,6 @@ var User = require('./app/models/user');
 var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
-var passport = require('passport');
-var OAuth2Strategy = require('passport-oauth2').OAuth2Strategy;
 
 var app = express();
 
@@ -25,20 +23,12 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
-// Use Passport/Oauth
-passport.use(new OAuth2Strategy({
-    authorizationURL: 'https://github.com/login/oauth/authorize',
-    tokenURL: 'https://github.com/login/oauth/access_token',
-    clientID: 'c37d88a9f85944ce119b',
-    clientSecret: '3238cd6a585e2fc867f3260d5e52a4f61930dd31',
-    callbackURL: 'http://localhost:4568/github'
-  },
-  function(accessToken, refreshToken, profile, done) {
-    User.findOrCreate({ exampleId: profile.id }, function (err, user) {
-      return done(err, user);
-    });
-  }
-));
+// use sessions
+  app.use(session({ secret: 'something',
+                   cookie: { maxAge: 10000,  },
+                   loggedin: false,
+                   resave: true,
+                   saveUninitialized: true}));
 
 // function to check for current session, otherwise send to login
 var restrict =  function(req,res,next) {
@@ -109,8 +99,19 @@ app.get('/login', function(req,res) {
   res.render('login');
 });
 
-app.post('/login', passport.authenticate, function(req,res) {
-
+app.post('/login', function(req,res) {
+    new User({username: req.body.username}).fetch()
+            .then(function(user) {
+                var hash = bcrypt.hashSync(req.body.password,user.get('salt'));
+                if(hash === user.get('password')) {
+                  req.session.regenerate(function() {
+                    req.session.loggedin = true;
+                    res.redirect(301,'/');
+                  });
+              } else {
+                res.redirect(301,'/login');
+              }
+              });
 });
 
 app.get('/signup', function(req,res) {
@@ -118,13 +119,17 @@ app.get('/signup', function(req,res) {
 });
 
 app.post('/signup', function(req, res) {
-
+  var salt = bcrypt.genSaltSync();
+  var hash = bcrypt.hashSync(req.body.password, salt);
+  new User({username: req.body.username,
+            password: hash,
+            salt: salt}).save().then(function() {
+              req.session.regenerate(function() {
+                req.session.loggedin = true;
+                res.redirect(301,'/');
+              });
+            });
 });
-
-app.get('/auth/github', passport.authenticate('github'));
-app.get('/auth/github/callback',
-        passport.authenticate('github', { successRedirect: '/',
-                                            failureRedirect: '/login' }));
 
 
 /************************************************************/

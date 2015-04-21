@@ -24,6 +24,9 @@
     "knex": "~0.5.7",
     "mocha": "^1.17.1",
     "nodemon": "^1.2.1",
+    "passport": "^0.2.1",
+    "passport-oauth": "^1.0.0",
+    "passport-oauth2": "^1.1.2",
     "request": "^2.34.0",
     "sessions": "0.0.2-7",
     "sqlite3": "~2.2.0"
