@@ -3,6 +3,7 @@ var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var session = require('express-session');
+var bcrypt = require('bcrypt-nodejs');
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -23,14 +24,15 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
 // use sessions
-app.use(session({ secret: 'something',
-                    loggedin: false,
+  app.use(session({ secret: 'something',
                    cookie: { maxAge: 10000 },
-                   resave: false,
+                   loggedin: false,
+                   resave: true,
                    saveUninitialized: true}));
 
 // function to check for current session, otherwise send to login
 var restrict =  function(req,res,next) {
+  console.log(req.session);
   if(req.session.loggedin) {
     next();
   } else {
@@ -98,9 +100,10 @@ app.get('/login', function(req,res) {
 });
 
 app.post('/login', function(req,res) {
-    new User({username: req.body.username,
-              password: req.body.password}).fetch().then(function(user) {
-                if(user) {
+    new User({username: req.body.username}).fetch()
+            .then(function(user) {
+                var hash = bcrypt.hashSync(req.body.password,user.get('salt'));
+                if(hash === user.get('password')) {
                   req.session.regenerate(function() {
                     req.session.loggedin = true;
                     res.redirect(301,'/');
@@ -116,8 +119,11 @@ app.get('/signup', function(req,res) {
 });
 
 app.post('/signup', function(req, res) {
+  var salt = bcrypt.genSaltSync();
+  var hash = bcrypt.hashSync(req.body.password, salt);
   new User({username: req.body.username,
-            password: req.body.password}).save().then(function() {
+            password: hash,
+            salt: salt}).save().then(function() {
               req.session.regenerate(function() {
                 req.session.loggedin = true;
                 res.redirect(301,'/');

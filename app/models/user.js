@@ -7,7 +7,8 @@ var User = db.Model.extend({
   hasTimestamps: false,
   defaults: {
     username: null,
-    password: null
+    password: null,
+    salt: null
   }
 });
 
