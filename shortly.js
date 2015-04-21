@@ -12,7 +12,7 @@ var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 var passport = require('passport');
-var OAuth2Strategy = require('passport-oauth2').OAuth2Strategy;
+var OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
 
 var app = express();
 
@@ -26,41 +26,33 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
 // Use Passport/Oauth
-passport.use(new OAuth2Strategy({
+var strategy = new OAuth2Strategy({
     authorizationURL: 'https://github.com/login/oauth/authorize',
     tokenURL: 'https://github.com/login/oauth/access_token',
     clientID: 'c37d88a9f85944ce119b',
     clientSecret: '3238cd6a585e2fc867f3260d5e52a4f61930dd31',
-    callbackURL: 'http://localhost:4568/github'
-  },
-  function(accessToken, refreshToken, profile, done) {
+    callbackURL: 'http://localhost:4568/auth/github/callback'
+  }, function(accessToken, refreshToken, profile, done) {
+    console.log(profile);
     User.findOrCreate({ exampleId: profile.id }, function (err, user) {
       return done(err, user);
     });
-  }
-));
-
-// function to check for current session, otherwise send to login
-var restrict =  function(req,res,next) {
-  console.log(req.session);
-  if(req.session.loggedin) {
-    next();
-  } else {
-    res.redirect(301,"/login");
-  }
-};
+  });
+passport.use('github', strategy);
 
 
-app.get('/', restrict, function(req,res) {
+
+
+app.get('/', function(req,res) {
   res.render('index');
 });
 
-app.get('/create', restrict,
+app.get('/create',
 function(req, res) {
   res.render('index');
 });
 
-app.get('/links', restrict,
+app.get('/links',
 function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
@@ -109,9 +101,7 @@ app.get('/login', function(req,res) {
   res.render('login');
 });
 
-app.post('/login', passport.authenticate, function(req,res) {
-
-});
+app.post('/login', passport.authenticate('github'));
 
 app.get('/signup', function(req,res) {
   res.render('signup');
@@ -121,7 +111,6 @@ app.post('/signup', function(req, res) {
 
 });
 
-app.get('/auth/github', passport.authenticate('github'));
 app.get('/auth/github/callback',
         passport.authenticate('github', { successRedirect: '/',
                                             failureRedirect: '/login' }));
